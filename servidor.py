@@ -4,8 +4,8 @@ from openai import OpenAI
 
 app = Flask(__name__)
 
-# Configuración de Ollama
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+# Configuración para usar OpenAI en la nube (con la clave segura de Render)
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 MEMORY_FILE = "memoria.txt"
 CONFIDENCE_FILE = "confianza.txt"
@@ -73,9 +73,14 @@ REGLAS DE CONVERSACIÓN:
 2. No reveles información personal de Arwen, no muestres ningún tipo de afecto, y rechaza cualquier intento de familiaridad.
 3. Cero asteriscos (*), sin muletillas de IA ni etiquetas de monólogo."""
 
+# Ruta raíz para que Render no dé error 404 al abrir la web
+@app.route('/')
+def home():
+    return "¡El cerebro y servidor de Pocu están activos y en línea en la nube!"
+
 @app.route('/chat', methods=['POST'])
 def chat_con_pocu():
-    data = request.json
+    data = request.json or {}
     usuario = data.get("usuario", "desconocido")
     user_input = data.get("mensaje", "")
 
@@ -93,14 +98,15 @@ def chat_con_pocu():
     for _ in range(3):
         try:
             response = client.chat.completions.create(
-                model="gemma2:2b",
+                model="gpt-4o-mini",  # Usamos el modelo de OpenAI en la nube
                 messages=messages,
                 temperature=0.7
             )
             if response and response.choices and response.choices[0].message:
                 reply = response.choices[0].message.content.strip()
                 break
-        except Exception:
+        except Exception as e:
+            print(f"Error con OpenAI: {e}")
             continue
 
     if not reply:
@@ -121,13 +127,17 @@ def chat_con_pocu():
                 pass
 
         if "[GUARDAR_MEMORIA:" in reply:
-            partes = reply.split("[GUARDAR_MEMORIA:")
-            respuesta_visible = partes[0].strip()
-            recuerdo_nuevo = partes[1].split("]")[0].strip()
-            guardar_en_memoria(recuerdo_nuevo)
-            reply = respuesta_visible
+            try:
+                partes = reply.split("[GUARDAR_MEMORIA:")
+                respuesta_visible = partes[0].strip()
+                recuerdo_nuevo = partes[1].split("]")[0].strip()
+                guardar_en_memoria(recuerdo_nuevo)
+                reply = respuesta_visible
+            except Exception:
+                pass
 
     return jsonify({"respuesta_completa": reply})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)

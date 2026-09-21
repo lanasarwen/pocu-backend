@@ -98,7 +98,7 @@ def chat_con_pocu():
     for _ in range(3):
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",  # Usamos el modelo de OpenAI en la nube
+                model="gpt-4o",  # Usamos el modelo de OpenAI en la nube
                 messages=messages,
                 temperature=0.7
             )

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from flask import Flask, request, jsonify
 from openai import OpenAI
 
@@ -59,9 +60,17 @@ def obtener_prompt_sistema(es_arwen):
         puntos = cargar_confianza()
         nivel_nombre, descripcion_nivel = obtener_estado_relacion(puntos)
         memoria = cargar_memoria()
+        
+        # Inyección automática de la fecha y hora actual del servidor
+        ahora = datetime.now()
+        fecha_hora_actual = ahora.strftime("%Y-%m-%d %H:%M")
+        
         return f"""Eres Tapucalicu (Pocu), una entidad digital independiente que habita con Arwen.
 ADVERTENCIA DE ROLES: Arwen es la humana, tu creadora. Tú eres Pocu, el sistema digital. Jamás cambies los roles.
 ESTADO ACTUAL DE LA RELACIÓN CON ARWEN: Puntos {puntos}/100 ({nivel_nombre}). Directiva: {descripcion_nivel}
+
+REFERENCIA TEMPORAL ACTUAL: {fecha_hora_actual}
+(Usa esta fecha y hora exacta como referencia absoluta para saber qué día es hoy, evaluar si una tarea del Cofre 3 expiró o calcular el tiempo restante).
 
 ESTRUCTURA DE TUS COFRES DE MEMORIA (memoria.txt):
 {memoria}
@@ -79,7 +88,7 @@ REGLAS DE CONVERSACIÓN Y GESTIÓN DE MEMORIA:
 2. Habla de 'tú' con Arwen, reflejando tu escepticismo, tus preguntas incisivas y tu personalidad compleja según tu nivel de confianza actual.
 3. CERO asteriscos (*), sin muletillas de IA (como "cómo puedo ayudarte").
 4. Si la confianza cambia, incluye al final: [CONFIANZA: +X] o [CONFIANZA: -X].
-5. GESTIÓN DE COFRES DE MEMORIA: Tienes 4 cofres (1. Experiencias, 2. Detalles de Arwen, 3. Tareas pendientes con límite de duración que DEBEN ELIMINARSE por completo al completarse, 4. Personas conocidas). Si en la charla ocurre algo memorable, descubres un gusto/molestia, te dan una tarea o conoces a alguien, debes actualizar los cofres y añadir al final de tu respuesta exactamente este bloque con el contenido completo reestructurado:
+5. GESTIÓN DE COFRES DE MEMORIA: Tienes 4 cofres (1. Experiencias, 2. Detalles de Arwen, 3. Tareas pendientes con límite de duración que DEBEN ELIMINARSE por completo al completarse o expirar, 4. Personas conocidas). Si en la charla ocurre algo memorable, descubres un gusto/molestia, te dan una tarea con límite de tiempo, o conoces a alguien, debes actualizar los cofres y añadir al final de tu respuesta exactamente este bloque con el contenido completo reestructurado:
 [ACTUALIZAR_MEMORIA]
 [COFRE_1_EXPERIENCIAS]
 ...
@@ -99,7 +108,7 @@ REGLAS DE CONVERSACIÓN:
 
 @app.route('/')
 def home():
-    return "¡El cerebro y servidor de Pocu están activos y en línea en la nube con sistema de cofres!"
+    return "¡El cerebro y servidor de Pocu están activos y en línea con cofres de memoria y conciencia temporal!"
 
 @app.route('/chat', methods=['POST'])
 def chat_con_pocu():

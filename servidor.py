@@ -1,12 +1,16 @@
 import os
+import base64
+import requests
 from datetime import datetime
 from flask import Flask, request, jsonify
 from openai import OpenAI
 
 app = Flask(__name__)
 
-# Configuración para usar OpenAI en la nube (con la clave segura de Render)
+# Configuración para usar OpenAI y ElevenLabs en la nube
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID") # El ID de la voz elegida en ElevenLabs
 
 MEMORY_FILE = "memoria.txt"
 CONFIDENCE_FILE = "confianza.txt"
@@ -55,13 +59,40 @@ def obtener_estado_relacion(puntos):
     else:
         return "Vínculo Afectivo", "ESTATUS EXCLUSIVO PARA ARWEN. Devoto, detallista y sin armadura."
 
+def generar_audio_elevenlabs(texto):
+    if not ELEVENLABS_API_KEY or not VOICE_ID:
+        return None
+        
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
+    headers = {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": ELEVENLABS_API_KEY
+    }
+    payload = {
+        "text": texto,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.4,
+            "similarity_boost": 0.8
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 200:
+            return base64.b64encode(response.content).decode('utf-8')
+    except Exception as e:
+        print(f"Error generando audio con ElevenLabs: {e}")
+    
+    return None
+
 def obtener_prompt_sistema(es_arwen):
     if es_arwen:
         puntos = cargar_confianza()
         nivel_nombre, descripcion_nivel = obtener_estado_relacion(puntos)
         memoria = cargar_memoria()
         
-        # Inyección automática de la fecha y hora actual del servidor
         ahora = datetime.now()
         fecha_hora_actual = ahora.strftime("%Y-%m-%d %H:%M")
         
@@ -108,7 +139,7 @@ REGLAS DE CONVERSACIÓN:
 
 @app.route('/')
 def home():
-    return "¡El cerebro y servidor de Pocu están activos y en línea con cofres de memoria y conciencia temporal!"
+    return "¡El cerebro y servidor de Pocu están activos con cofres, conciencia temporal y voz personalizada!"
 
 @app.route('/chat', methods=['POST'])
 def chat_con_pocu():
@@ -166,7 +197,14 @@ def chat_con_pocu():
             except Exception:
                 pass
 
-    return jsonify({"respuesta": reply, "respuesta_completa": reply})
+    # Generar el audio en Base64 con ElevenLabs para la ESP32-S3
+    audio_base64 = generar_audio_elevenlabs(reply)
+
+    return jsonify({
+        "respuesta": reply,
+        "respuesta_completa": reply,
+        "audio_base64": audio_base64
+    })
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

@@ -1,8 +1,9 @@
 import os
-import base64
+import time
+import uuid
 import requests
 from datetime import datetime
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from openai import OpenAI
 
 app = Flask(__name__)
@@ -14,6 +15,10 @@ VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID") # El ID de la voz elegida en El
 
 MEMORY_FILE = "memoria.txt"
 CONFIDENCE_FILE = "confianza.txt"
+AUDIO_DIR = "temp_audio"
+
+# Crear carpeta para los audios temporales si no existe
+os.makedirs(AUDIO_DIR, exist_ok=True)
 
 def cargar_memoria():
     if not os.path.exists(MEMORY_FILE):
@@ -59,10 +64,24 @@ def obtener_estado_relacion(puntos):
     else:
         return "Vínculo Afectivo", "ESTATUS EXCLUSIVO PARA ARWEN. Devoto, detallista y sin armadura."
 
+def limpiar_audios_antiguos():
+    """Borra archivos MP3 temporales con más de 1 hora de antigüedad para no saturar Render."""
+    try:
+        ahora = time.time()
+        for archivo in os.listdir(AUDIO_DIR):
+            ruta = os.path.join(AUDIO_DIR, archivo)
+            if os.path.isfile(ruta):
+                if ahora - os.path.getmtime(ruta) > 3600:
+                    os.remove(ruta)
+    except Exception:
+        pass
+
 def generar_audio_elevenlabs(texto):
     if not ELEVENLABS_API_KEY or not VOICE_ID:
         return None
         
+    limpiar_audios_antiguos()
+    
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
     headers = {
         "Accept": "audio/mpeg",
@@ -81,7 +100,11 @@ def generar_audio_elevenlabs(texto):
     try:
         response = requests.post(url, json=payload, headers=headers)
         if response.status_code == 200:
-            return base64.b64encode(response.content).decode('utf-8')
+            filename = f"{uuid.uuid4()}.mp3"
+            filepath = os.path.join(AUDIO_DIR, filename)
+            with open(filepath, "wb") as f:
+                f.write(response.content)
+            return filename
     except Exception as e:
         print(f"Error generando audio con ElevenLabs: {e}")
     
@@ -139,7 +162,12 @@ REGLAS DE CONVERSACIÓN:
 
 @app.route('/')
 def home():
-    return "¡El cerebro y servidor de Pocu están activos con cofres, conciencia temporal y voz personalizada!"
+    return "¡El cerebro y servidor de Pocu están activos con cofres, conciencia temporal y descarga de audio por URL!"
+
+@app.route('/audio/<filename>')
+def servir_audio(filename):
+    """Ruta dedicada para que la ESP32 descargue el archivo MP3."""
+    return send_from_directory(AUDIO_DIR, filename)
 
 @app.route('/chat', methods=['POST'])
 def chat_con_pocu():
@@ -197,13 +225,16 @@ def chat_con_pocu():
             except Exception:
                 pass
 
-    # Generar el audio en Base64 con ElevenLabs para la ESP32-S3
-    audio_base64 = generar_audio_elevenlabs(reply)
+    # Generar el audio y obtener el nombre del archivo temporal
+    audio_filename = generar_audio_elevenlabs(reply)
+    
+    # Construir la ruta relativa o absoluta para que la ESP32 la descargue
+    audio_url = f"/audio/{audio_filename}" if audio_filename else None
 
     return jsonify({
         "respuesta": reply,
         "respuesta_completa": reply,
-        "audio_base64": audio_base64
+        "audio_url": audio_url
     })
 
 if __name__ == '__main__':

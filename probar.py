@@ -4,12 +4,11 @@ url = "https://pocu-backend.onrender.com/chat"
 
 payload = {
     "usuario": "Arwen",
-    "mensaje": "Hola Pocu, ¿notas alguna diferencia con tu nueva actualización en la nube?"
+    "mensaje": "Pocu, ¿recuerdas qué odio y qué tarea tengo pendiente para hoy?"
 }
 
 try:
     response = requests.post(url, json=payload)
-    print("Estado:", response.status_code)
     print("Respuesta de Pocu:", response.json())
 except Exception as e:
-    print("Ocurrió un error:", e)
+    print("Error:", e)

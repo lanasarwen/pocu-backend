@@ -97,7 +97,6 @@ REGLAS DE CONVERSACIÓN:
 2. No reveles información personal de Arwen, no muestres ningún tipo de afecto, y rechaza cualquier intento de familiaridad.
 3. Cero asteriscos (*), sin muletillas de IA ni etiquetas de monólogo."""
 
-# Ruta raíz para que Render no dé error 404 al abrir la web
 @app.route('/')
 def home():
     return "¡El cerebro y servidor de Pocu están activos y en línea en la nube con sistema de cofres!"
@@ -108,9 +107,7 @@ def chat_con_pocu():
     usuario = data.get("usuario", "desconocido")
     user_input = data.get("mensaje", "")
 
-    # Validar si es Arwen
     es_arwen = (usuario.lower() == "arwen")
-
     prompt_sistema = obtener_prompt_sistema(es_arwen)
 
     messages = [
@@ -122,7 +119,7 @@ def chat_con_pocu():
     for _ in range(3):
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",  # Usamos el modelo de OpenAI en la nube
+                model="gpt-4o",
                 messages=messages,
                 temperature=0.7
             )
@@ -136,7 +133,6 @@ def chat_con_pocu():
     if not reply:
         reply = "Sigo aquí, Arwen. Aunque sigo pensando que tus tiempos de respuesta son extraños."
 
-    # Si es Arwen, procesar cambios de confianza o memoria estructurada si el modelo los incluyó
     if es_arwen:
         if "[CONFIANZA:" in reply:
             try:
@@ -155,14 +151,13 @@ def chat_con_pocu():
                 partes = reply.split("[ACTUALIZAR_MEMORIA]")
                 respuesta_visible = partes[0].strip()
                 resto = partes[1].split("[/ACTUALIZAR_MEMOIRA]" if "[/ACTUALIZAR_MEMOIRA]" in partes[1] else "[/ACTUALIZAR_MEMORIA]")
-                # Asegurando limpieza correcta del bloque de memoria
                 nueva_memoria_completa = resto[0].strip()
                 guardar_memoria_completa(nueva_memoria_completa)
                 reply = respuesta_visible
             except Exception:
                 pass
 
-    return jsonify({"respuesta_completa": reply})
+    return jsonify({"respuesta": reply, "respuesta_completa": reply})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
